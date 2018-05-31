@@ -29,6 +29,11 @@ else()
   llvm_map_components_to_libraries(llvm_libs support core irreader bitwriter transformutils)
 endif()
 
+add_library(RA SHARED
+    RangeAnalysis.h
+    RangeAnalysis.cpp
+)
+
 add_executable(ra
         RangeAnalysis.cpp
 	    plugin.cpp
