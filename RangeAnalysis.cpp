@@ -18,25 +18,6 @@
 
 using namespace llvm;
 
-// These macros are used to get stats regarding the precision of our analysis.
-STATISTIC(usedBits, "Initial number of bits.");
-STATISTIC(needBits, "Needed bits.");
-STATISTIC(percentReduction, "Percentage of reduction of the number of bits.");
-STATISTIC(numSCCs, "Number of strongly connected components.");
-STATISTIC(numAloneSCCs, "Number of SCCs containing only one node.");
-STATISTIC(sizeMaxSCC, "Size of largest SCC.");
-STATISTIC(numVars, "Number of variables");
-STATISTIC(numUnknown, "Number of unknown variables");
-STATISTIC(numEmpty, "Number of empty-set variables");
-STATISTIC(numCPlusInf, "Number of variables [c, +inf].");
-STATISTIC(numCC, "Number of variables [c, c].");
-STATISTIC(numMinInfC, "Number of variables [-inf, c].");
-STATISTIC(numMaxRange, "Number of variables [-inf, +inf].");
-STATISTIC(numConstants, "Number of constants.");
-STATISTIC(numZeroUses, "Number of variables without any use.");
-STATISTIC(numNotInt, "Number of variables that are not Integer.");
-STATISTIC(numOps, "Number of operations");
-STATISTIC(maxVisit, "Max number of times a value has been visited.");
 
 // The number of bits needed to store the largest variable of the function (APInt).
 unsigned MAX_BIT_INT = 1;
@@ -114,7 +95,6 @@ static bool isValidInstruction(const Instruction* I) {
 // ========================================================================== //
 unsigned RangeAnalysis::getMaxBitWidth(const Function& F) {
 	unsigned int InstBitSize = 0, opBitSize = 0, max = 0;
-
 	// Obtains the maximum bit width of the instructions of the function.
 	for (const_inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
 		InstBitSize = I->getType()->getPrimitiveSizeInBits();
@@ -125,10 +105,10 @@ unsigned RangeAnalysis::getMaxBitWidth(const Function& F) {
 		// Obtains the maximum bit width of the operands of the instruction.
 		User::const_op_iterator bgn = I->op_begin(), end = I->op_end();
 		for (; bgn != end; ++bgn) {
-			opBitSize = (*bgn)->getType()->getPrimitiveSizeInBits();
-			if ((*bgn)->getType()->isIntegerTy() && opBitSize > max) {
-				max = opBitSize;
-			}
+			//opBitSize = (*bgn)->getType()->getPrimitiveSizeInBits();
+			//if ((*bgn)->getType()->isIntegerTy() && opBitSize > max) {
+			//	max = opBitSize;
+			//}
 		}
 	}
 
@@ -195,7 +175,6 @@ Cousot IntraProceduralRA::run(Function &F) {
 
 	MAX_BIT_INT = getMaxBitWidth(F);
 	updateMinMax(MAX_BIT_INT);
-
 	// Build the graph and find the intervals of the variables.
 	CG->buildGraph(F);
 	CG->buildVarNodes();
@@ -298,7 +277,7 @@ void InterProceduralRA::MatchParametersAndReturnValues(Function &F,
 
 	for (i = 0, argptr = F.arg_begin(), e = F.arg_end(); argptr != e;
 			++i, ++argptr)
-		Parameters[i].first = argptr;
+		Parameters[i].first = &*argptr;
 
 	// Check if the function returns a supported value type. If not, no return value matching is done
 	bool noReturn = F.getReturnType()->isVoidTy();
@@ -1801,7 +1780,7 @@ ConstraintGraph::~ConstraintGraph() {
 //	errs() << "\nConstraintGraph::~ConstraintGraph : "<< this->vars.size();
 	//delete symbMap;
 
-	for (VarNodes::iterator vit = vars.begin(), vend = vars.end();
+/*	for (VarNodes::iterator vit = vars.begin(), vend = vars.end();
 			vit != vend; ++vit) {
 		delete vit->second;
 	}
@@ -1819,7 +1798,7 @@ ConstraintGraph::~ConstraintGraph() {
 	for (ValuesSwitchMap::iterator vit = valuesSwitchMap.begin(), vend =
 			valuesSwitchMap.end(); vit != vend; ++vit) {
 		vit->second.clear();
-	}
+	}*/
 }
 
 Range ConstraintGraph::getRange(const Value *v) {
@@ -2164,7 +2143,7 @@ void ConstraintGraph::buildValueSwitchMap(const SwitchInst *sw) {
             continue;
         }
 
-		const ConstantInt *constant = CI->getCaseValue();
+		const ConstantInt *constant = CI.getCaseValue();
 
 		APInt sigMin = constant->getValue();
 		APInt sigMax = sigMin;
@@ -2809,23 +2788,14 @@ void ConstraintGraph::findIntervals() {
 
 	// List of SCCs
 	Nuutila sccList(&vars, &useMap, &symbMap);
-	// STATS
-	numSCCs += sccList.worklist.size();
-#ifdef SCC_DEBUG
-	unsigned numberOfSCCs = numSCCs;
-#endif
 
 	// For each SCC in graph, do the following
 	for (Nuutila::iterator nit = sccList.begin(), nend = sccList.end();
 			nit != nend; ++nit) {
 		SmallPtrSet<VarNode*, 32> &component = *sccList.components[*nit];
-#ifdef SCC_DEBUG
-		--numberOfSCCs;
-#endif
 		//PRINTCOMPONENT(component)
 
 		if (component.size() == 1) {
-			++numAloneSCCs;
 			fixIntersects(component);
 			
 			VarNode *var = *component.begin();
@@ -2833,9 +2803,6 @@ void ConstraintGraph::findIntervals() {
 				var->setRange(Range(Min, Max));
 			}
 		}else{
-			if (component.size() > sizeMaxSCC) {
-				sizeMaxSCC = component.size();
-			}
 
 			UseMap compUseMap = buildUseMap(component);
 
@@ -2886,9 +2853,6 @@ void ConstraintGraph::findIntervals() {
 		propagateToNextSCC(component);
 	}
 
-#ifdef SCC_DEBUG
-	ASSERT(numberOfSCCs==0, "Not all SCCs have been visited")
-#endif
 
 }
 
@@ -3038,102 +3002,6 @@ void ConstraintGraph::printResultIntervals() {
 	}
 
 	errs() << "\n";
-}
-
-void ConstraintGraph::computeStats() {
-	for (VarNodes::const_iterator vbgn = vars.begin(), vend = vars.end();
-			vbgn != vend; ++vbgn) {
-		// We only count the instructions that have uses.
-		if (vbgn->first->getNumUses() == 0) {
-			++numZeroUses;
-			//continue;
-		}
-
-		// ConstantInts must NOT be counted!!
-		if (isa<ConstantInt>(vbgn->first)) {
-			++numConstants;
-			continue;
-		}
-		
-		// Variables that are not IntegerTy are ignored
-		if (!vbgn->first->getType()->isIntegerTy()) {
-			++numNotInt;
-			continue;
-		}
-
-
-		// Count original (used) bits
-		unsigned total = vbgn->first->getType()->getPrimitiveSizeInBits();
-		usedBits += total;
-		Range CR = vbgn->second->getRange();
-
-		// If range is unknown, we have total needed bits
-		if (CR.isUnknown()) {
-			++numUnknown;
-			needBits += total;
-			continue;
-		}
-
-		// If range is empty, we have 0 needed bits
-		if (CR.isEmpty()) {
-			++numEmpty;
-			continue;
-		}
-		
-		if (CR.getLower().eq(Min)) {
-			if (CR.getUpper().eq(Max)) {
-				++numMaxRange;
-			}
-			else {
-				++numMinInfC;
-			}
-		}
-		else if (CR.getUpper().eq(Max)) {
-			++numCPlusInf;
-		}
-		else {
-			++numCC;
-		}
-
-		unsigned ub, lb;
-
-		if (CR.getLower().isNegative()) {
-			APInt abs = CR.getLower().abs();
-			lb = abs.getActiveBits() + 1;
-		} else {
-			lb = CR.getLower().getActiveBits() + 1;
-		}
-
-		if (CR.getUpper().isNegative()) {
-			APInt abs = CR.getUpper().abs();
-			ub = abs.getActiveBits() + 1;
-		} else {
-			ub = CR.getUpper().getActiveBits() + 1;
-		}
-
-		unsigned nBits = lb > ub ? lb : ub;
-		
-		// If both bounds are positive, decrement needed bits by 1
-		if (!CR.getLower().isNegative() && !CR.getUpper().isNegative()) {
-			--nBits;
-		}
-
-		if (nBits < total) {
-			needBits += nBits;
-		} else {
-			needBits += total;
-		}
-//		errs() << "\nVar [" << vbgn->first->getNameStr() <<"] Range"<< CR <<" Total ["<<total<<"] Needed ["<<nBits <<"]";
-	}
-
-	double totalB = usedBits;
-	double needB = needBits;
-	double reduction = (double) (totalB - needB) * 100 / totalB;
-	percentReduction = (unsigned int) reduction;
-
-
-	numVars += this->vars.size();
-	numOps += this->oprs.size();
 }
 
 /*
