@@ -33,9 +33,3 @@ add_library(RA SHARED
     RangeAnalysis.h
     RangeAnalysis.cpp
 )
-
-add_executable(ra
-        RangeAnalysis.cpp
-	    plugin.cpp
-)
-target_link_libraries(ra ${llvm_libs})
