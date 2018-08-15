@@ -2136,14 +2136,21 @@ void ConstraintGraph::buildValueSwitchMap(const SwitchInst *sw) {
 	}
 
 	// Handle the rest of cases
+#if LLVM_VERSION_MAJOR >= 4
+    for (SwitchInst::ConstCaseIt CI = sw->case_begin(), CEnd = sw->case_end();
+         CI != CEnd; ++CI) {
+#else
     unsigned caseNum = 0;
-	for(auto CI = sw->case_begin(); CI != sw->case_end(); CI++){
+	for(auto CI = sw->case_begin(); CI != sw->case_end(); CI++) {
+#endif
 		if (CI == sw->case_default()) {
+#if LLVM_VERSION_MAJOR < 4
             caseNum++;
+#endif
             continue;
         }
 
-		const ConstantInt *constant = CI.getCaseValue();
+		const ConstantInt *constant = CI->getCaseValue();
 
 		APInt sigMin = constant->getValue();
 		APInt sigMax = sigMin;
@@ -2165,7 +2172,9 @@ void ConstraintGraph::buildValueSwitchMap(const SwitchInst *sw) {
 		BasicInterval* BI = new BasicInterval(Values);
 
 		BBsuccs.push_back(std::make_pair(BI, succ));
+#if LLVM_VERSION_MAJOR < 4
         caseNum++;
+#endif
 	}
 
 
