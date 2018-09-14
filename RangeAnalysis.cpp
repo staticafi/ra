@@ -2150,8 +2150,11 @@ void ConstraintGraph::buildValueSwitchMap(const SwitchInst *sw) {
             continue;
         }
 
+#if LLVM_VERSION_MAJOR > 4
 		const ConstantInt *constant = CI->getCaseValue();
-
+#else
+		const ConstantInt *constant = CI.getCaseValue();
+#endif
 		APInt sigMin = constant->getValue();
 		APInt sigMax = sigMin;
 
