@@ -33,3 +33,5 @@ add_library(RA SHARED
     RangeAnalysis.h
     RangeAnalysis.cpp
 )
+
+install(TARGETS RA LIBRARY DESTINATION lib)
