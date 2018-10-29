@@ -2389,7 +2389,7 @@ APInt getFirstLessFromVector(const SmallVector<APInt, 2> &constantvector, const 
 	for (SmallVectorImpl<APInt>::const_reverse_iterator vit = constantvector.rbegin(), vend = constantvector.rend(); vit != vend; ++vit) {
 		const APInt &vapint = *vit;
 
-		if (vapint.sle(val)) {
+		if (vapint.signedRoundToDouble() <= val.signedRoundToDouble()) {
 			return vapint;
 		}
 	}
