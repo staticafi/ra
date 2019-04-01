@@ -2326,7 +2326,7 @@ void ConstraintGraph::buildValueBranchMap(const BranchInst *br) {
 void ConstraintGraph::buildValueMaps(const Function& F) {
 	for (Function::const_iterator iBB = F.begin(), eBB = F.end(); iBB != eBB;
 			++iBB) {
-		const TerminatorInst* ti = iBB->getTerminator();
+		const auto ti = iBB->getTerminator();
 		const BranchInst* br = dyn_cast<BranchInst>(ti);
 		const SwitchInst* sw = dyn_cast<SwitchInst>(ti);
 
